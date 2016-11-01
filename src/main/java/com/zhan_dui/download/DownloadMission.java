@@ -6,7 +6,6 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.util.ArrayList;
 import java.util.Timer;
-import java.util.TimerTask;
 
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
@@ -40,7 +39,7 @@ public class DownloadMission {
 	protected int missionId = MISSION_ID_COUNTER++;
 	@XmlElementWrapper(name = "Downloadings")
 	@XmlElement(name = "Downloading")
-	private ArrayList<DownloadRunnable> downloadParts = new ArrayList<>();
+	private ArrayList<DownloadWorker> downloadParts = new ArrayList<>();
 
 	private ArrayList<RecoveryRunnableInfo> recoveryRunnableInfos = new ArrayList<>();
 
@@ -64,7 +63,7 @@ public class DownloadMission {
 	protected Timer speedTimer = new Timer();
 	protected Timer storeTimer = new Timer();
 
-	protected DownloadThreadPool threadPoolRef;
+	protected DownloadScheduler threadPoolRef;
 
 	@SuppressWarnings("unused")
 	private DownloadMission() {
@@ -145,8 +144,8 @@ public class DownloadMission {
 		return DEFAULT_THREAD_COUNT;
 	}
 
-	private ArrayList<DownloadRunnable> splitDownload(int threadCount) {
-		ArrayList<DownloadRunnable> runnables = new ArrayList<>();
+	private ArrayList<DownloadWorker> splitDownload(int threadCount) {
+		ArrayList<DownloadWorker> runnables = new ArrayList<>();
 		try {
 			int size = getContentLength(this.url);
 			this.fileSize = size;
@@ -154,7 +153,7 @@ public class DownloadMission {
 			for (int i = 0; i < threadCount; i++) {
 				int startPos = sublen * i;
 				int endPos = (i == threadCount - 1) ? size : (sublen * (i + 1) - 1);
-				DownloadRunnable runnable = new DownloadRunnable(this.monitor, this.url, this.saveDirectory, this.saveName, startPos, endPos);
+				DownloadWorker runnable = new DownloadWorker(this.monitor, this.url, this.saveDirectory, this.saveName, startPos, endPos);
 				runnables.add(runnable);
 			}
 		} catch (IOException e) {
@@ -179,7 +178,7 @@ public class DownloadMission {
 			}
 			ArrayList<RecoveryRunnableInfo> recoveryRunnableInfos = getDownloadProgress();
 			recoveryRunnableInfos.clear();
-			for (DownloadRunnable runnable : mission.downloadParts) {
+			for (DownloadWorker runnable : mission.downloadParts) {
 				recoveryRunnableInfos.add(new RecoveryRunnableInfo(runnable.getStartPosition(), runnable.getCurrentPosition(), runnable.getEndPosition()));
 			}
 			this.speedMonitor = new SpeedMonitor(this);
@@ -191,7 +190,7 @@ public class DownloadMission {
 		}
 	}
 
-	public void startMission(DownloadThreadPool threadPool) {
+	public void startMission(DownloadScheduler threadPool) {
 		setDownloadStatus(DOWNLOADING);
 		try {
 			resumeMission();
@@ -202,16 +201,16 @@ public class DownloadMission {
 		if (!this.recoveryRunnableInfos.isEmpty()) {
 			for (RecoveryRunnableInfo runnableInfo : this.recoveryRunnableInfos) {
 				if (!runnableInfo.isFinished()) {
-					DownloadRunnable runnable = new DownloadRunnable(this.monitor, this.url, this.saveDirectory, this.saveName, runnableInfo.getStartPosition(), runnableInfo.getCurrentPosition(),
-							runnableInfo.getEndPosition());
-					this.downloadParts.add(runnable);
-					threadPool.submit(runnable);
+					DownloadWorker worker = new DownloadWorker(this.monitor, this.url, this.saveDirectory, this.saveName, 
+							runnableInfo.getStartPosition(), runnableInfo.getCurrentPosition(), runnableInfo.getEndPosition());
+					this.downloadParts.add(worker);
+					threadPool.push(worker);
 				}
 			}
 		} else {
-			for (DownloadRunnable runnable : splitDownload(this.threadCount)) {
+			for (DownloadWorker runnable : splitDownload(this.threadCount)) {
 				this.downloadParts.add(runnable);
-				threadPool.submit(runnable);
+				threadPool.push(runnable);
 			}
 		}
 		this.speedTimer.scheduleAtFixedRate(this.speedMonitor, 0, 1000);
@@ -222,7 +221,7 @@ public class DownloadMission {
 		return this.isFinished;
 	}
 
-	public void addPartedMission(DownloadRunnable runnable) {
+	public void addPartedMission(DownloadWorker runnable) {
 		this.downloadParts.add(runnable);
 	}
 
@@ -336,8 +335,7 @@ public class DownloadMission {
 		}
 	}
 
-	public static DownloadMission recoverMissionFromProgressFile(
-			String progressDirectory, String progressFileName)
+	public static DownloadMission recoverMissionFromProgressFile(String progressDirectory, String progressFileName)
 			throws IOException {
 		try {
 			File progressFile = new File(FileUtils.getSafeDirPath(progressDirectory) + File.separator + progressFileName);
@@ -355,7 +353,7 @@ public class DownloadMission {
 			mission.setProgessFile(progressDirectory, progressFileName);
 			mission.missionId = MISSION_ID_COUNTER++;
 			ArrayList<RecoveryRunnableInfo> recoveryRunnableInfos = mission.getDownloadProgress();
-			for (DownloadRunnable runnable : mission.downloadParts) {
+			for (DownloadWorker runnable : mission.downloadParts) {
 				recoveryRunnableInfos.add(new RecoveryRunnableInfo(runnable.getStartPosition(), runnable.getCurrentPosition(), runnable.getEndPosition()));
 			}
 			mission.downloadParts.clear();

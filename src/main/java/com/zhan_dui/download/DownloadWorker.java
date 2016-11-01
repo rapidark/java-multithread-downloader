@@ -16,7 +16,7 @@ import javax.xml.bind.annotation.XmlRootElement;
 @SuppressWarnings("restriction")
 @XmlRootElement(name = "Downloading")
 @XmlAccessorType(XmlAccessType.NONE)
-public class DownloadRunnable implements Runnable {
+public class DownloadWorker implements Runnable {
 
 	private static final int BUFFER_SIZE = 1024;
 
@@ -38,13 +38,13 @@ public class DownloadRunnable implements Runnable {
 	private MissionMonitor downloadMonitor;
 
 	@SuppressWarnings("unused")
-	private DownloadRunnable() {
+	private DownloadWorker() {
 		// just use for annotation
 		// -1 is meanningless
 		MISSION_ID = -1;
 	}
 
-	public DownloadRunnable(MissionMonitor monitor, String fileUrl, String saveDirectory, String saveFileName, 
+	public DownloadWorker(MissionMonitor monitor, String fileUrl, String saveDirectory, String saveFileName, 
 			int startPosition, int endPosition) {
 		super();
 		this.fileUrl = fileUrl;
@@ -57,14 +57,13 @@ public class DownloadRunnable implements Runnable {
 		MISSION_ID = monitor.hostMission.missionId;
 	}
 
-	public DownloadRunnable(MissionMonitor monitor, String fileUrl, String saveDirectory, String saveFileName, 
+	public DownloadWorker(MissionMonitor monitor, String fileUrl, String saveDirectory, String saveFileName, 
 			int startPosition, int currentPosition, int endPosition) {
 		this(monitor, fileUrl, saveDirectory, saveFileName, startPosition, endPosition);
 		this.currentPosition = currentPosition;
 	}
-
-	@Override
-	public void run() {
+	
+	private File initTargetFile() {
 		File targetFile;
 		synchronized (this) {
 			File dir = new File(saveDirectory + File.pathSeparator);
@@ -80,21 +79,25 @@ public class DownloadRunnable implements Runnable {
 				}
 			}
 		}
+		return targetFile;
+	}
 
+	@Override
+	public void run() {
+		File targetFile =  initTargetFile();
+		
 		String downloadInfo = MessageFormat.format("Download Task ID:{0} has been started! Range From {1} To {2}", Thread.currentThread().getId(), currentPosition, endPosition);
 		System.out.println(downloadInfo);
 		
-		BufferedInputStream bufferedInputStream = null;
 		RandomAccessFile randomAccessFile = null;
 		byte[] buf = new byte[BUFFER_SIZE];
-		URLConnection urlConnection = null;
+		
 		try {
-			URL url = new URL(fileUrl);
-			urlConnection = url.openConnection();
-			urlConnection.setRequestProperty("Range", "bytes=" + currentPosition + "-" + endPosition);
+			RemoteHttpFile remoteHttpFile = new RemoteHttpFile(fileUrl, currentPosition, endPosition);
+			
 			randomAccessFile = new RandomAccessFile(targetFile, "rw");
 			randomAccessFile.seek(currentPosition);
-			bufferedInputStream = new BufferedInputStream(urlConnection.getInputStream());
+			
 			while (currentPosition < endPosition) {
 				if (Thread.currentThread().isInterrupted()) {
 					String interruptedInfo = MessageFormat.format("Download TaskID:{0} was interrupted, Start:{1} Current:{2} End:{3}", 
@@ -102,7 +105,7 @@ public class DownloadRunnable implements Runnable {
 					System.out.println(interruptedInfo);
 					break;
 				}
-				int len = bufferedInputStream.read(buf, 0, BUFFER_SIZE);
+				int len = remoteHttpFile.read(buf);
 				if (len == -1) {
 					break;
 				} else {
@@ -111,14 +114,14 @@ public class DownloadRunnable implements Runnable {
 					downloadMonitor.down(len);
 				}
 			}
-			bufferedInputStream.close();
+			remoteHttpFile.close();
 			randomAccessFile.close();
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
 
-	public DownloadRunnable split() {
+	public DownloadWorker split() {
 		int end = endPosition;
 		int remaining = endPosition - currentPosition;
 		int remainingCenter = remaining / 2;
@@ -130,7 +133,7 @@ public class DownloadRunnable implements Runnable {
 			System.out.print(" Center position:" + centerPosition);
 			endPosition = centerPosition;
 
-			DownloadRunnable newSplitedRunnable = new DownloadRunnable(downloadMonitor, fileUrl, saveDirectory, saveFileName, centerPosition + 1, end);
+			DownloadWorker newSplitedRunnable = new DownloadWorker(downloadMonitor, fileUrl, saveDirectory, saveFileName, centerPosition + 1, end);
 			downloadMonitor.hostMission.addPartedMission(newSplitedRunnable);
 			return newSplitedRunnable;
 		} else {

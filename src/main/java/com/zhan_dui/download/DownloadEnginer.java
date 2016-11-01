@@ -9,7 +9,7 @@ public class DownloadEnginer {
 
 	private static DownloadEnginer instance = new DownloadEnginer();
 
-	private static DownloadThreadPool threadPool;
+	private static DownloadScheduler threadPool;
 
 	public static final int DEFAULT_MISSION_THREAD_COUNT = 4;
 	public static final int DEFAULT_CORE_POOL_SIZE = 10;
@@ -21,7 +21,7 @@ public class DownloadEnginer {
 	
 	public static DownloadEnginer getInstance() {
 		if (threadPool.isShutdown()) {
-			threadPool = new DownloadThreadPool(DEFAULT_CORE_POOL_SIZE,
+			threadPool = new DownloadScheduler(DEFAULT_CORE_POOL_SIZE,
 					DEFAULT_MAX_POOL_SIZE, DEFAULT_KEEP_ALIVE_TIME,
 					TimeUnit.SECONDS, new LinkedBlockingDeque<Runnable>());
 		}
@@ -31,7 +31,7 @@ public class DownloadEnginer {
 	private Hashtable<Integer, DownloadMission> missions = new Hashtable<>();
 
 	private DownloadEnginer() {
-		threadPool = new DownloadThreadPool(DEFAULT_CORE_POOL_SIZE,
+		threadPool = new DownloadScheduler(DEFAULT_CORE_POOL_SIZE,
 				DEFAULT_MAX_POOL_SIZE, DEFAULT_KEEP_ALIVE_TIME,
 				TimeUnit.SECONDS, new LinkedBlockingDeque<Runnable>());
 	}
@@ -42,6 +42,12 @@ public class DownloadEnginer {
 		}
 	}
 
+	public void start() {
+		for (DownloadMission mission : missions.values()) {
+			mission.startMission(threadPool);
+		}
+	}
+	
 	public DownloadMission addMission(String url, String saveDirectory, String saveName) throws IOException {
 		DownloadMission downloadMission = new DownloadMission(url, saveDirectory, saveName);
 		addMission(downloadMission);
@@ -52,46 +58,16 @@ public class DownloadEnginer {
 		missions.put(ID++, downloadTask);
 	}
 
-	public DownloadMission getMission(int missionID) {
-		return missions.get(missionID);
-	}
-
-	public void start() {
-		for (DownloadMission mission : missions.values()) {
-			mission.startMission(threadPool);
-		}
-	}
-
-	public boolean isAllMissionsFinished() {
-		for (Integer missionId : missions.keySet()) {
-			if (!isMissionFinished(missionId)) {
-				return false;
-			}
-		}
-		return true;
-	}
-
-	public boolean isMissionFinished(int missionId) {
-		DownloadMission mission = missions.get(missionId);
-		return mission.isFinished();
-	}
-
-	public void pauseAllMissions() {
-		for (Integer missionID : missions.keySet()) {
-			pauseMission(missionID);
-		}
-	}
-
 	public void pauseMission(int missionId) {
 		if (missions.contains(missionId)) {
 			DownloadMission mission = missions.get(missionId);
 			mission.pause();
 		}
 	}
-
-	public void cancelAllMissions() {
-		for (Integer missionId : missions.keySet()) {
-			cancelMission(missionId);
+	
+	public void pauseAllMissions() {
+		for (Integer missionID : missions.keySet()) {
+			pauseMission(missionID);
 		}
 	}
 
@@ -102,11 +78,39 @@ public class DownloadEnginer {
 		}
 	}
 
+	public void cancelAllMissions() {
+		for (Integer missionId : missions.keySet()) {
+			cancelMission(missionId);
+		}
+	}
+	
 	public void shutdownSafely() {
 		for (Integer missionId : missions.keySet()) {
 			missions.get(missionId).pause();
 		}
 		threadPool.shutdown();
+	}
+	
+	public void shutdDownloadRudely() {
+		threadPool.shutdownNow();
+	}
+	
+	public DownloadMission getMission(int missionID) {
+		return missions.get(missionID);
+	}
+
+	public boolean isMissionFinished(int missionId) {
+		DownloadMission mission = missions.get(missionId);
+		return mission.isFinished();
+	}
+	
+	public boolean isAllMissionsFinished() {
+		for (Integer missionId : missions.keySet()) {
+			if (!isMissionFinished(missionId)) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	public int getTotalDownloadedSize() {
@@ -133,7 +137,4 @@ public class DownloadEnginer {
 		return DownloadUtils.getReadableSpeed(getTotalSpeed());
 	}
 
-	public void shutdDownloadRudely() {
-		threadPool.shutdownNow();
-	}
 }
