@@ -5,7 +5,7 @@ import java.io.IOException;
 public class Test {
 
 	public static void main(String[] args) {
-		DownloadManager downloadManager = DownloadManager.getInstance();
+		DownloadEnginer downloadManager = DownloadEnginer.getInstance();
 		String qQString = "http://dldir1.qq.com/qqfile/qq/QQ2013/QQ2013Beta2.exe";
 		String APK = "http://down.myapp.com/android/45592/881859/qq2013_4.0.2.1550_android.apk";
 		String phaseString = "http://dictionary.b0.upaiyun.com/phrase.zip";

@@ -4,8 +4,8 @@ import java.io.File;
 import java.io.IOException;
 
 public class FileUtils {
+	
 	private FileUtils() {
-
 	}
 
 	public static String getSafeDirPath(String dirPath) {
@@ -15,8 +15,7 @@ public class FileUtils {
 		return dirPath;
 	}
 
-	public static File getSafeFile(String dirPath, String fileName)
-			throws IOException {
+	public static File getSafeFile(String dirPath, String fileName) throws IOException {
 		dirPath = getSafeDirPath(dirPath);
 		File dir = new File(dirPath);
 		dir.mkdirs();

@@ -4,6 +4,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.xml.bind.annotation.adapters.XmlAdapter;
 
+@SuppressWarnings("restriction")
 public class AtomicIntegerAdapter extends XmlAdapter<Integer, AtomicInteger> {
 
 	@Override
