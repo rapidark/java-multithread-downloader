@@ -1,4 +1,4 @@
-package com.zhan_dui.download;
+package com.abigdreamer.common.download;
 
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
@@ -13,8 +13,8 @@ public class DownloadScheduler {
 
 	private ThreadPoolExecutor executor;
 	
-	private ConcurrentHashMap<Future<?>, DownloadWorker> runnableMonitorMap = new ConcurrentHashMap<>();
-	private ConcurrentHashMap<Integer, ConcurrentLinkedQueue<Future<?>>> missionMonitors = new ConcurrentHashMap<>();
+	private ConcurrentHashMap<Future<?>, DownloadWorker> workerFuturesMap = new ConcurrentHashMap<>();
+	private ConcurrentHashMap<Integer, ConcurrentLinkedQueue<Future<?>>> missionWorkerFutures = new ConcurrentHashMap<>();
 
 	public DownloadScheduler(int corePoolSize, int maximumPoolSize,
 			long keepAliveTime, TimeUnit unit,
@@ -64,12 +64,12 @@ public class DownloadScheduler {
 		} else {
 			System.out.println(Thread.currentThread().getId() + " errroed! Retry");
 		}
-		for (Future<?> future : runnableMonitorMap.keySet()) {
-			if (!future.isDone()) {
-				DownloadWorker runnable = runnableMonitorMap.get(future);
-				DownloadWorker newRunnable = runnable.split();
-				if (newRunnable != null) {
-					push(newRunnable);
+		for (Future<?> workerFuture : workerFuturesMap.keySet()) {
+			if (!workerFuture.isDone()) {
+				DownloadWorker worker = workerFuturesMap.get(workerFuture);
+				DownloadWorker splitWorker = worker.split();
+				if (splitWorker != null) {
+					push(splitWorker);
 					break;
 				}
 			}
@@ -77,23 +77,23 @@ public class DownloadScheduler {
 	}
 
 	public Future<?> push(DownloadWorker worker) {
-		Future<?> future = executor.submit(worker);
+		Future<?> workerFuture = executor.submit(worker);
 
-		if (missionMonitors.containsKey(worker.MISSION_ID)) {
-			missionMonitors.get(worker.MISSION_ID).add(future);
+		if (missionWorkerFutures.containsKey(worker.MISSION_ID)) {
+			missionWorkerFutures.get(worker.MISSION_ID).add(workerFuture);
 		} else {
 			ConcurrentLinkedQueue<Future<?>> queue = new ConcurrentLinkedQueue<>();
-			queue.add(future);
-			missionMonitors.put(worker.MISSION_ID, queue);
+			queue.add(workerFuture);
+			missionWorkerFutures.put(worker.MISSION_ID, queue);
 		}
 
-		runnableMonitorMap.put(future, worker);
+		workerFuturesMap.put(workerFuture, worker);
 
-		return future;
+		return workerFuture;
 	}
 
 	public boolean isFinished(int missionId) {
-		ConcurrentLinkedQueue<Future<?>> futures = missionMonitors.get(missionId);
+		ConcurrentLinkedQueue<Future<?>> futures = missionWorkerFutures.get(missionId);
 		if (futures == null) {
 			return true;
 		}
@@ -107,16 +107,16 @@ public class DownloadScheduler {
 	}
 
 	public void pause(int missionId) {
-		ConcurrentLinkedQueue<Future<?>> futures = missionMonitors.get(missionId);
-		for (Future<?> future : futures) {
-			future.cancel(true);
+		ConcurrentLinkedQueue<Future<?>> futures = missionWorkerFutures.get(missionId);
+		for (Future<?> workerFuture : futures) {
+			workerFuture.cancel(true);
 		}
 	}
 
 	public void cancel(int missionId) {
-		ConcurrentLinkedQueue<Future<?>> futures = missionMonitors.remove(missionId);
+		ConcurrentLinkedQueue<Future<?>> futures = missionWorkerFutures.remove(missionId);
 		for (Future<?> future : futures) {
-			runnableMonitorMap.remove(future);
+			workerFuturesMap.remove(future);
 			future.cancel(true);
 		}
 	}

@@ -1,15 +1,15 @@
-package com.abigdreamer.download;
+package com.abigdreamer.common.download;
 
 import java.io.File;
 import java.io.IOException;
 
-import com.zhan_dui.download.DownloadEnginer;
-import com.zhan_dui.download.DownloadMission;
+import com.abigdreamer.common.download.DownloadEnginer;
+import com.abigdreamer.common.download.DownloadMission;
 
 public class Test {
 
 	public static void main(String[] args) {
-		DownloadEnginer downloadManager = DownloadEnginer.getInstance();
+		DownloadEnginer downloadEnginer = DownloadEnginer.getInstance();
 //		String qQString = "http://dldir1.qq.com/qqfile/qq/QQ2013/QQ2013Beta2.exe";
 //		String APK = "http://down.myapp.com/android/45592/881859/qq2013_4.0.2.1550_android.apk";
 //		String phaseString = "http://dictionary.b0.upaiyun.com/phrase.zip";
@@ -19,8 +19,8 @@ public class Test {
 //		String google = "http://down11.zol.com.cn/suyan/ggpy2.1.0.apk";
 
 		String file1 = "http://apache.fayea.com/tomcat/tomcat-9/v9.0.0.M11/bin/apache-tomcat-9.0.0.M11.zip";
-		String file2 = "http://apache.fayea.com/tomcat/tomcat-9/v9.0.0.M11/bin/apache-tomcat-9.0.0.M11.zip";
-		String file3 = "http://apache.fayea.com/tomcat/tomcat-9/v9.0.0.M11/bin/apache-tomcat-9.0.0.M11.zip";
+//		String file2 = "http://apache.fayea.com/tomcat/tomcat-9/v9.0.0.M11/bin/apache-tomcat-9.0.0.M11.zip";
+//		String file3 = "http://apache.fayea.com/tomcat/tomcat-9/v9.0.0.M11/bin/apache-tomcat-9.0.0.M11.zip";
 		
 		/*** type you save direcotry ****/
 		String temp = System.getProperty("user.dir") + File.separator + "temp" + File.separator;
@@ -28,15 +28,15 @@ public class Test {
 		
 		try {
 			DownloadMission mission = new DownloadMission(file1, saveDirectory, "test1");
-			downloadManager.addMission(mission);
+			downloadEnginer.addMission(mission);
 //			DownloadMission mission2 = new DownloadMission(file2, saveDirectory, "test2");
 //			downloadManager.addMission(mission2);
 //			DownloadMission mission3 = new DownloadMission(file3, saveDirectory, "test3");
 //			downloadManager.addMission(mission3);
 			
-			downloadManager.start();
+			downloadEnginer.start();
 			
-			int counter = 0;
+			//int counter = 0;
 			while (true) {
 				// System.out.println("The mission has finished :"
 				// + mission.getReadableSize() + "Active Count:"
@@ -46,18 +46,19 @@ public class Test {
 				// + mission.getReadableAverageSpeed() + " MaxSpeed:"
 				// + mission.getReadableMaxSpeed() + " Time:"
 				// + mission.getTimePassed() + "s");
-				System.out.println("Downloader information Speed:"
-						+ downloadManager.getReadableTotalSpeed()
-						+ " Down Size:"
-						+ downloadManager.getReadableDownloadSize());
+				System.out.println("Downloader information Speed:" + downloadEnginer.getReadableTotalSpeed() + " Down Size:" + downloadEnginer.getReadableDownloadSize());
 				Thread.sleep(1000);
-				counter++;
+				//counter++;
 				// if (counter == 6) {
 				// mission.pause();
 				// }
 				// if (counter == 11) {
 				// downloadManager.start();
 				// }
+				if(downloadEnginer.isAllMissionsFinished()) {
+					downloadEnginer.shutdownSafely();
+					break;
+				}
 			}
 		} catch (IOException e1) {
 			e1.printStackTrace();

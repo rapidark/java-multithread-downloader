@@ -1,4 +1,4 @@
-package com.zhan_dui.download;
+package com.abigdreamer.common.download;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -15,17 +15,18 @@ import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
  * @version V1.0
  */
 @SuppressWarnings("restriction")
-@XmlRootElement(name = "MissionMonitor")
+@XmlRootElement(name = "mission-monitor")
 @XmlAccessorType(XmlAccessType.NONE)
 public class MissionMonitor {
 
 	public final DownloadMission hostMission;
 
-	@XmlElement(name = "DownloadedSize")
+	@XmlElement(name = "downloaded-size")
 	@XmlJavaTypeAdapter(AtomicIntegerAdapter.class)
 	private AtomicInteger downloadedSize = new AtomicInteger();
 
-	public MissionMonitor() {
+	@SuppressWarnings("unused")
+	private MissionMonitor() {
 		hostMission = null;
 	}
 

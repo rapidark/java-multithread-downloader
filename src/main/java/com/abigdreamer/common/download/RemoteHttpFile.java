@@ -1,4 +1,4 @@
-package com.zhan_dui.download;
+package com.abigdreamer.common.download;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;

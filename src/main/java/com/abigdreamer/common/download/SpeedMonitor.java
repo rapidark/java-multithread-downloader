@@ -1,4 +1,4 @@
-package com.zhan_dui.download;
+package com.abigdreamer.common.download;
 
 import java.util.TimerTask;
 
@@ -18,20 +18,20 @@ import javax.xml.bind.annotation.XmlRootElement;
 @XmlAccessorType(XmlAccessType.NONE)
 class SpeedMonitor extends TimerTask {
 
-	@XmlElement(name = "LastSecondSize")
+	@XmlElement(name = "last-second-size")
 	private int lastSecondSize = 0;
-	@XmlElement(name = "CurrentSecondSize")
+	@XmlElement(name = "current-second-size")
 	private int currentSecondSize = 0;
-	@XmlElement(name = "Speed")
+	@XmlElement(name = "speed")
 	private int speed;
-	@XmlElement(name = "MaxSpeed")
+	@XmlElement(name = "max-speed")
 	private int maxSpeed;
-	@XmlElement(name = "AverageSpeed")
+	@XmlElement(name = "average-speed")
 	private int averageSpeed;
-	@XmlElement(name = "TimePassed")
-	private int counter;
+	@XmlElement(name = "seconds")
+	private int seconds;
 
-	private DownloadMission mHostMission;
+	private DownloadMission mission;
 
 	@SuppressWarnings("unused")
 	private SpeedMonitor() {
@@ -43,24 +43,24 @@ class SpeedMonitor extends TimerTask {
 	}
 
 	public SpeedMonitor(DownloadMission missionBelongTo) {
-		mHostMission = missionBelongTo;
+		this.mission = missionBelongTo;
 	}
 
 	@Override
 	public void run() {
-		this.counter++;
-		this.currentSecondSize = this.mHostMission.getDownloadedSize();
+		this.seconds++;
+		this.currentSecondSize = this.mission.getDownloadedSize();
 		this.speed = this.currentSecondSize - this.lastSecondSize;
 		this.lastSecondSize = this.currentSecondSize;
 		if (this.speed > this.maxSpeed) {
 			this.maxSpeed = this.speed;
 		}
 
-		this.averageSpeed = this.currentSecondSize / this.counter;
+		this.averageSpeed = this.currentSecondSize / this.seconds;
 	}
 
 	public int getDownloadedTime() {
-		return this.counter;
+		return this.seconds;
 	}
 
 	public int getSpeed() {

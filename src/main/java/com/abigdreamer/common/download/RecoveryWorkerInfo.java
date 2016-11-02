@@ -1,4 +1,4 @@
-package com.zhan_dui.download;
+package com.abigdreamer.common.download;
 
 /**
  *  
@@ -6,23 +6,19 @@ package com.zhan_dui.download;
  * @date 2016年11月1日 下午6:48:26
  * @version V1.0
  */
-public class RecoveryRunnableInfo {
+public class RecoveryWorkerInfo {
 
 	private int startPosition;
 	private int endPosition;
 	private int currentPosition;
-	private boolean isFinished = false;
 
-	public RecoveryRunnableInfo(int start, int current, int end) {
+	public RecoveryWorkerInfo(int start, int current, int end) {
 		if (end > start && current > start) {
 			startPosition = start;
 			endPosition = end;
 			currentPosition = current;
 		} else {
 			throw new RuntimeException("position logical error");
-		}
-		if (currentPosition >= endPosition) {
-			isFinished = true;
 		}
 	}
 
@@ -39,6 +35,6 @@ public class RecoveryRunnableInfo {
 	}
 
 	public boolean isFinished() {
-		return isFinished;
+		return currentPosition >= endPosition;
 	}
 }

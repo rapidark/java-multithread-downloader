@@ -1,4 +1,4 @@
-package com.zhan_dui.download;
+package com.abigdreamer.common.download;
 
 import java.io.File;
 import java.io.IOException;
@@ -18,7 +18,7 @@ import javax.xml.bind.annotation.XmlElementWrapper;
 import javax.xml.bind.annotation.XmlRootElement;
 
 @SuppressWarnings("restriction")
-@XmlRootElement(namespace = "com.zhan_dui.downloader")
+@XmlRootElement(namespace = "com.abigdreamer.common.download")
 @XmlAccessorType(XmlAccessType.NONE)
 public class DownloadMission {
 
@@ -30,40 +30,40 @@ public class DownloadMission {
 	public static int DEFAULT_THREAD_COUNT = 4;
 	private static int MISSION_ID_COUNTER = 0;
 	
-	@XmlElement(name = "URL")
-	protected String url;
-	@XmlElement(name = "SaveDirectory")
-	protected String saveDirectory;
-	@XmlElement(name = "SaveName")
-	protected String saveName;
 	protected int missionId = MISSION_ID_COUNTER++;
-	@XmlElementWrapper(name = "Downloadings")
-	@XmlElement(name = "Downloading")
-	private ArrayList<DownloadWorker> downloadParts = new ArrayList<>();
+	
+	@XmlElement(name = "url")
+	protected String url;
+	@XmlElement(name = "folder")
+	protected String folder;
+	@XmlElement(name = "file-name")
+	protected String fileName;
+	@XmlElementWrapper(name = "download-workers")
+	@XmlElement(name = "download-worker")
+	private ArrayList<DownloadWorker> downloadWorkers = new ArrayList<>();
 
-	private ArrayList<RecoveryRunnableInfo> recoveryRunnableInfos = new ArrayList<>();
+	private ArrayList<RecoveryWorkerInfo> recoveryWorkerInfos = new ArrayList<>();
 
-	@XmlElement(name = "MissionStatus")
+	@XmlElement(name = "mission-status")
 	private int missionStatus = READY;
 
 	private String progressDir;
 	private String progressFileName;
 	
-	@XmlElement(name = "FileSize")
+	@XmlElement(name = "file-size")
 	private int fileSize;
 	private int threadCount = DEFAULT_THREAD_COUNT;
-	private boolean isFinished = false;
 
-	@XmlElement(name = "MissionMonitor")
+	@XmlElement(name = "mission-monitor")
 	protected MissionMonitor monitor = new MissionMonitor(this);
-	@XmlElement(name = "SpeedMonitor")
+	@XmlElement(name = "speed-monitor")
 	protected SpeedMonitor speedMonitor = new SpeedMonitor(this);
 
 	protected StoreMonitor storeMonitor = new StoreMonitor(this);
 	protected Timer speedTimer = new Timer();
 	protected Timer storeTimer = new Timer();
 
-	protected DownloadScheduler threadPoolRef;
+	protected DownloadScheduler scheduler;
 
 	@SuppressWarnings("unused")
 	private DownloadMission() {
@@ -75,14 +75,14 @@ public class DownloadMission {
 
 		setTargetFile(saveDirectory, saveName);
 
-		setProgessFile(this.saveDirectory, this.saveName);
+		setProgessFile(this.folder, this.fileName);
 	}
 
 	public boolean setTargetFile(String saveDir, String saveName) throws IOException {
 		if (saveDir.lastIndexOf(File.separator) == saveDir.length() - 1) {
 			saveDir = saveDir.substring(0, saveDir.length() - 1);
 		}
-		this.saveDirectory = saveDir;
+		this.folder = saveDir;
 		File dirFile = new File(saveDir);
 		if (!dirFile.exists()) {
 			if (!dirFile.mkdirs()) {
@@ -94,7 +94,7 @@ public class DownloadMission {
 		if (!file.exists()) {
 			file.createNewFile();
 		}
-		this.saveName = saveName;
+		this.fileName = saveName;
 		return true;
 	}
 
@@ -111,19 +111,19 @@ public class DownloadMission {
 	}
 
 	public String getSaveDirectory() {
-		return this.saveDirectory;
+		return this.folder;
 	}
 
 	public void setSaveDirectory(String saveDirectory) {
-		this.saveDirectory = saveDirectory;
+		this.folder = saveDirectory;
 	}
 
 	public String getSaveName() {
-		return this.saveName;
+		return this.fileName;
 	}
 
 	public void setSaveName(String saveName) {
-		this.saveName = saveName;
+		this.fileName = saveName;
 	}
 
 	public void setMissionThreadCount(int threadCount) {
@@ -153,8 +153,8 @@ public class DownloadMission {
 			for (int i = 0; i < threadCount; i++) {
 				int startPos = sublen * i;
 				int endPos = (i == threadCount - 1) ? size : (sublen * (i + 1) - 1);
-				DownloadWorker runnable = new DownloadWorker(this.monitor, this.url, this.saveDirectory, this.saveName, startPos, endPos);
-				runnables.add(runnable);
+				DownloadWorker worker = new DownloadWorker(this.monitor, this.url, this.folder, this.fileName, startPos, endPos);
+				runnables.add(worker);
 			}
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -168,61 +168,65 @@ public class DownloadMission {
 			if (!progressFile.exists()) {
 				throw new IOException("Progress File does not exsist");
 			}
+			
+			if(progressFile.length() == 0) {
+				return;
+			}
 
 			JAXBContext context = JAXBContext.newInstance(DownloadMission.class);
 			Unmarshaller unmarshaller = context.createUnmarshaller();
 			DownloadMission mission = (DownloadMission) unmarshaller.unmarshal(progressFile);
-			File targetSaveFile = new File(FileUtils.getSafeDirPath(mission.saveDirectory + File.separator + mission.saveName));
+			File targetSaveFile = new File(FileUtils.getSafeDirPath(mission.folder + File.separator + mission.fileName));
 			if (!targetSaveFile.exists()) {
 				throw new IOException("Try to continue download file , but target file does not exist");
 			}
-			ArrayList<RecoveryRunnableInfo> recoveryRunnableInfos = getDownloadProgress();
-			recoveryRunnableInfos.clear();
-			for (DownloadWorker runnable : mission.downloadParts) {
-				recoveryRunnableInfos.add(new RecoveryRunnableInfo(runnable.getStartPosition(), runnable.getCurrentPosition(), runnable.getEndPosition()));
+			ArrayList<RecoveryWorkerInfo> recoveryWorkerInfos = getDownloadProgress();
+			recoveryWorkerInfos.clear();
+			for (DownloadWorker worker : mission.downloadWorkers) {
+				recoveryWorkerInfos.add(new RecoveryWorkerInfo(worker.getStartPosition(), worker.getCurrentPosition(), worker.getEndPosition()));
 			}
 			this.speedMonitor = new SpeedMonitor(this);
 			this.storeMonitor = new StoreMonitor(this);
 			System.out.println("Resume finished");
-			this.downloadParts.clear();
+			this.downloadWorkers.clear();
 		} catch (JAXBException e) {
 			e.printStackTrace();
 		}
 	}
 
-	public void startMission(DownloadScheduler threadPool) {
+	public void startMission(DownloadScheduler scheduler) {
 		setDownloadStatus(DOWNLOADING);
 		try {
 			resumeMission();
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-		this.threadPoolRef = threadPool;
-		if (!this.recoveryRunnableInfos.isEmpty()) {
-			for (RecoveryRunnableInfo runnableInfo : this.recoveryRunnableInfos) {
-				if (!runnableInfo.isFinished()) {
-					DownloadWorker worker = new DownloadWorker(this.monitor, this.url, this.saveDirectory, this.saveName, 
-							runnableInfo.getStartPosition(), runnableInfo.getCurrentPosition(), runnableInfo.getEndPosition());
-					this.downloadParts.add(worker);
-					threadPool.push(worker);
+		this.scheduler = scheduler;
+		if (!this.recoveryWorkerInfos.isEmpty()) {
+			for (RecoveryWorkerInfo workerInfo : this.recoveryWorkerInfos) {
+				if (!workerInfo.isFinished()) {
+					DownloadWorker worker = new DownloadWorker(this.monitor, this.url, this.folder, this.fileName, 
+							workerInfo.getStartPosition(), workerInfo.getCurrentPosition(), workerInfo.getEndPosition());
+					this.downloadWorkers.add(worker);
+					scheduler.push(worker);
 				}
 			}
 		} else {
 			for (DownloadWorker runnable : splitDownload(this.threadCount)) {
-				this.downloadParts.add(runnable);
-				threadPool.push(runnable);
+				this.downloadWorkers.add(runnable);
+				scheduler.push(runnable);
 			}
 		}
-		this.speedTimer.scheduleAtFixedRate(this.speedMonitor, 0, 1000);
-		this.storeTimer.scheduleAtFixedRate(this.storeMonitor, 0, 5000);
+		this.speedTimer.scheduleAtFixedRate(this.speedMonitor, 0, 1000);// 1s
+		this.storeTimer.scheduleAtFixedRate(this.storeMonitor, 0, 5000);// 5s
 	}
 
 	public boolean isFinished() {
-		return this.isFinished;
+		return missionStatus == FINISHED;
 	}
 
 	public void addPartedMission(DownloadWorker runnable) {
-		this.downloadParts.add(runnable);
+		this.downloadWorkers.add(runnable);
 	}
 
 	private int getContentLength(String fileUrl) throws IOException {
@@ -255,7 +259,7 @@ public class DownloadMission {
 	}
 
 	public File getDownloadFile() {
-		return new File(this.saveDirectory + File.separator + this.saveName);
+		return new File(this.folder + File.separator + this.fileName);
 	}
 
 	public String getProgressDir() {
@@ -303,7 +307,7 @@ public class DownloadMission {
 	}
 
 	public int getActiveTheadCount() {
-		return this.threadPoolRef.getActiveCount();
+		return this.scheduler.getActiveCount();
 	}
 
 	public int getFileSize() {
@@ -313,12 +317,11 @@ public class DownloadMission {
 	public void pause() {
 		setDownloadStatus(PAUSED);
 		storeProgress();
-		this.threadPoolRef.pause(this.missionId);
+		this.scheduler.pause(this.missionId);
 	}
 
 	void setDownloadStatus(int status) {
 		if (status == FINISHED) {
-			this.isFinished = true;
 			this.speedTimer.cancel();
 		}
 		this.missionStatus = status;
@@ -346,17 +349,17 @@ public class DownloadMission {
 			JAXBContext context = JAXBContext.newInstance(DownloadMission.class);
 			Unmarshaller unmarshaller = context.createUnmarshaller();
 			DownloadMission mission = (DownloadMission) unmarshaller.unmarshal(progressFile);
-			File targetSaveFile = new File(FileUtils.getSafeDirPath(mission.saveDirectory + File.separator + mission.saveName));
+			File targetSaveFile = new File(FileUtils.getSafeDirPath(mission.folder + File.separator + mission.fileName));
 			if (!targetSaveFile.exists()) {
 				throw new IOException("Try to continue download file , but target file does not exist");
 			}
 			mission.setProgessFile(progressDirectory, progressFileName);
 			mission.missionId = MISSION_ID_COUNTER++;
-			ArrayList<RecoveryRunnableInfo> recoveryRunnableInfos = mission.getDownloadProgress();
-			for (DownloadWorker runnable : mission.downloadParts) {
-				recoveryRunnableInfos.add(new RecoveryRunnableInfo(runnable.getStartPosition(), runnable.getCurrentPosition(), runnable.getEndPosition()));
+			ArrayList<RecoveryWorkerInfo> recoveryRunnableInfos = mission.getDownloadProgress();
+			for (DownloadWorker runnable : mission.downloadWorkers) {
+				recoveryRunnableInfos.add(new RecoveryWorkerInfo(runnable.getStartPosition(), runnable.getCurrentPosition(), runnable.getEndPosition()));
 			}
-			mission.downloadParts.clear();
+			mission.downloadWorkers.clear();
 			return mission;
 		} catch (JAXBException e) {
 			e.printStackTrace();
@@ -368,14 +371,14 @@ public class DownloadMission {
 		getProgressFile().delete();
 	}
 
-	public ArrayList<RecoveryRunnableInfo> getDownloadProgress() {
-		return this.recoveryRunnableInfos;
+	public ArrayList<RecoveryWorkerInfo> getDownloadProgress() {
+		return this.recoveryWorkerInfos;
 	}
 
 	public void cancel() {
 		deleteProgressFile();
 		this.speedTimer.cancel();
-		this.downloadParts.clear();
-		this.threadPoolRef.cancel(missionId);
+		this.downloadWorkers.clear();
+		this.scheduler.cancel(missionId);
 	}
 }

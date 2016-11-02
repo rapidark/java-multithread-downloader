@@ -1,11 +1,8 @@
-package com.zhan_dui.download;
+package com.abigdreamer.common.download;
 
-import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.net.URL;
-import java.net.URLConnection;
 import java.text.MessageFormat;
 
 import javax.xml.bind.annotation.XmlAccessType;
